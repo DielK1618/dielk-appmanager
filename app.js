@@ -13,7 +13,6 @@ import {
   doc, query, orderBy, limit, serverTimestamp, getCountFromServer, where
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-// ── Firebase 초기화 ──────────────────────────
 const firebaseConfig = {
   apiKey: "AIzaSyB_8hn5GKx8EUnDf9r_BcnSv9YurmSNgdo",
   authDomain: "dielk-vault.firebaseapp.com",
@@ -29,6 +28,7 @@ const db   = getFirestore(firebaseApp);
 
 let registeredApps = [];
 let selectedAppId  = "all";
+let editingPushId  = null; // 편집 중인 알림 ID (null이면 신규 발송)
 
 // ── 유틸 ─────────────────────────────────────
 function showToast(msg) {
@@ -60,6 +60,20 @@ function getAppName(appId) {
   if (appId === "all") return "전체";
   const found = registeredApps.find(a => a.appId === appId);
   return found ? found.name : appId;
+}
+
+// ── 발송 폼 상태 관리 ────────────────────────
+function resetPushForm() {
+  editingPushId = null;
+  document.getElementById("push-title").value = "";
+  document.getElementById("push-body").value  = "";
+  const btn = document.getElementById("send-push-btn");
+  btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:white;margin-right:6px;vertical-align:middle"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>발송하기`;
+  btn.style.background = "";
+  // 신규작성 버튼 숨기기
+  document.getElementById("push-new-btn").classList.add("hidden");
+  // 편집 안내 숨기기
+  document.getElementById("push-edit-notice").classList.add("hidden");
 }
 
 // ── 페이지 전환 ──────────────────────────────
@@ -440,15 +454,27 @@ window.deleteMessage = async (msgId) => {
   } catch (e) { showToast("삭제 실패: " + e.message); }
 };
 
-// ── 푸시 알림 ────────────────────────────────
+// ── 푸시 알림 발송 ────────────────────────────
 document.getElementById("send-push-btn").addEventListener("click", async () => {
   const appId = document.getElementById("push-appid").value;
   const title = document.getElementById("push-title").value.trim();
   const body  = document.getElementById("push-body").value.trim();
   if (!title || !body) { showToast("제목과 내용을 입력하세요."); return; }
+
   const btn = document.getElementById("send-push-btn");
   btn.textContent = "발송 중..."; btn.disabled = true;
+
   try {
+    // ✅ 편집 모드면 이전 알림 먼저 삭제 후 신규 발송
+    if (editingPushId) {
+      await deleteDoc(doc(db, "push_history", editingPushId));
+      const logsSnap = await getDocs(
+        query(collection(db, "notification_logs"), where("pushId", "==", editingPushId))
+      );
+      await Promise.all(logsSnap.docs.map(d => deleteDoc(d.ref)));
+      editingPushId = null;
+    }
+
     await addDoc(collection(db, "push_queue"), {
       appId: appId || "all", title, body,
       status: "pending", createdAt: serverTimestamp(),
@@ -460,19 +486,27 @@ document.getElementById("send-push-btn").addEventListener("click", async () => {
       sentAt: serverTimestamp(),
       sentBy: auth.currentUser?.email || "master"
     });
-    showToast("푸시 알림이 발송되었습니다! ✓");
-    document.getElementById("push-title").value = "";
-    document.getElementById("push-body").value  = "";
+
+    showToast(editingPushId ? "수정 발송 완료! ✓" : "푸시 알림이 발송되었습니다! ✓");
+    resetPushForm();
     loadPushHistory(); loadDashboard();
+
   } catch (e) {
     showToast("발송 실패: " + e.message);
   } finally {
     btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:white;margin-right:6px;vertical-align:middle"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>발송하기`;
+    btn.style.background = "";
     btn.disabled = false;
   }
 });
 
-// ✅ 푸시 알림 발송 내역 — 편집/삭제 기능 추가
+// ✅ 신규 작성 / 편집 취소 버튼
+document.getElementById("push-new-btn").addEventListener("click", () => {
+  resetPushForm();
+  showToast("새 알림 작성 모드입니다.");
+});
+
+// ── 푸시 발송 내역 ────────────────────────────
 async function loadPushHistory() {
   const list = document.getElementById("push-history-list");
   list.innerHTML = '<div class="empty-msg">로딩 중...</div>';
@@ -511,55 +545,42 @@ async function loadPushHistory() {
   }
 }
 
-// ✅ 푸시 알림 편집
-window.editPush = async (pushId, currentTitle, currentBody) => {
-  const newTitle = prompt("새 제목을 입력하세요:", currentTitle);
-  if (newTitle === null) return;
-  const newBody = prompt("새 내용을 입력하세요:", currentBody);
-  if (newBody === null) return;
-  if (!newTitle.trim() || !newBody.trim()) { showToast("제목과 내용을 입력하세요."); return; }
+// ✅ 편집 버튼 — 발송 폼에 내용 채우기 (이전 알림은 발송 시에만 삭제)
+window.editPush = (pushId, currentTitle, currentBody) => {
+  editingPushId = pushId;
+  document.getElementById("push-title").value = currentTitle;
+  document.getElementById("push-body").value  = currentBody;
 
-  try {
-    // push_history 업데이트
-    await updateDoc(doc(db, "push_history", pushId), {
-      title: newTitle.trim(),
-      body: newBody.trim(),
-      editedAt: serverTimestamp()
-    });
+  // 발송 버튼 스타일 변경
+  const btn = document.getElementById("send-push-btn");
+  btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:white;margin-right:6px;vertical-align:middle"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>수정 발송하기`;
+  btn.style.background = "#7c3aed";
 
-    // ✅ 읽음 기록 삭제 → 모든 수신자 안읽음 처리
-    const logsSnap = await getDocs(
-      query(collection(db, "notification_logs"), where("pushId", "==", pushId))
-    );
-    const deletePromises = logsSnap.docs.map(d => deleteDoc(d.ref));
-    await Promise.all(deletePromises);
+  // 신규작성(취소) 버튼 표시
+  document.getElementById("push-new-btn").classList.remove("hidden");
 
-    showToast("알림이 편집되었습니다. 수신자 안읽음 처리 완료! ✓");
-    loadPushHistory();
-  } catch (e) {
-    showToast("편집 실패: " + e.message);
-  }
+  // 편집 안내 표시
+  const notice = document.getElementById("push-edit-notice");
+  notice.classList.remove("hidden");
+  notice.textContent = "✏️ 편집 모드 — 수정 후 발송하면 이전 알림이 삭제되고 새 알림이 발송돼요.";
+
+  // 폼으로 스크롤
+  document.getElementById("push-title").scrollIntoView({ behavior: "smooth" });
+  document.getElementById("push-title").focus();
 };
 
-// ✅ 푸시 알림 삭제
+// ✅ 삭제 버튼
 window.deletePush = async (pushId) => {
   if (!confirm("이 알림을 삭제하시겠습니까?\n수신자의 알림 내역에서도 사라집니다.")) return;
   try {
-    // push_history 삭제
     await deleteDoc(doc(db, "push_history", pushId));
-
-    // notification_logs에서도 삭제
     const logsSnap = await getDocs(
       query(collection(db, "notification_logs"), where("pushId", "==", pushId))
     );
-    const deletePromises = logsSnap.docs.map(d => deleteDoc(d.ref));
-    await Promise.all(deletePromises);
-
+    await Promise.all(logsSnap.docs.map(d => deleteDoc(d.ref)));
     showToast("알림이 삭제되었습니다. ✓");
     loadPushHistory(); loadDashboard();
-  } catch (e) {
-    showToast("삭제 실패: " + e.message);
-  }
+  } catch (e) { showToast("삭제 실패: " + e.message); }
 };
 
 // ── 설정 ─────────────────────────────────────
