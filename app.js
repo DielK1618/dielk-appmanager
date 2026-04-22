@@ -28,7 +28,7 @@ const db   = getFirestore(firebaseApp);
 
 let registeredApps = [];
 let selectedAppId  = "all";
-let editingPushId  = null; // 편집 중인 알림 ID (null이면 신규 발송)
+let editingPushId  = null;
 
 // ── 유틸 ─────────────────────────────────────
 function showToast(msg) {
@@ -62,7 +62,7 @@ function getAppName(appId) {
   return found ? found.name : appId;
 }
 
-// ── 발송 폼 상태 관리 ────────────────────────
+// ── 발송 폼 초기화 ───────────────────────────
 function resetPushForm() {
   editingPushId = null;
   document.getElementById("push-title").value = "";
@@ -70,9 +70,7 @@ function resetPushForm() {
   const btn = document.getElementById("send-push-btn");
   btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:white;margin-right:6px;vertical-align:middle"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>발송하기`;
   btn.style.background = "";
-  // 신규작성 버튼 숨기기
   document.getElementById("push-new-btn").classList.add("hidden");
-  // 편집 안내 숨기기
   document.getElementById("push-edit-notice").classList.add("hidden");
 }
 
@@ -80,6 +78,9 @@ function resetPushForm() {
 const PAGES_WITH_TABBAR = ["users", "messages", "push"];
 
 function showPage(pageId) {
+  // ✅ 현재 페이지 저장 (새로고침 시 복원)
+  sessionStorage.setItem("currentPage", pageId);
+
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
   const target = document.getElementById("page-" + pageId);
@@ -149,18 +150,26 @@ function updateAppSelects() {
 // ── 인증 ─────────────────────────────────────
 onAuthStateChanged(auth, async (user) => {
   if (user) {
-    document.getElementById("login-screen").classList.add("hidden");
-    document.getElementById("app").classList.remove("hidden");
+    // ✅ 깜빡임 없이 앱 화면 표시
+    document.getElementById("login-screen").style.display = "none";
+    document.getElementById("app").style.display = "flex";
+
     const name = user.displayName || user.email.split("@")[0];
     document.getElementById("admin-name-display").textContent = name;
     document.getElementById("admin-avatar").textContent = getInitials(user.displayName, user.email);
     document.getElementById("settings-email").value = user.email;
     document.getElementById("settings-name").value  = user.displayName || "";
+
     await loadAppsList();
-    showPage("dashboard");
+
+    // ✅ 새로고침 시 마지막 페이지 복원
+    const lastPage = sessionStorage.getItem("currentPage") || "dashboard";
+    showPage(lastPage);
+
   } else {
-    document.getElementById("login-screen").classList.remove("hidden");
-    document.getElementById("app").classList.add("hidden");
+    // ✅ 로그아웃 시 로그인 화면 표시
+    document.getElementById("login-screen").style.display = "flex";
+    document.getElementById("app").style.display = "none";
   }
 });
 
@@ -184,6 +193,7 @@ document.getElementById("login-password").addEventListener("keydown", e => {
 });
 document.getElementById("logout-btn").addEventListener("click", async () => {
   await signOut(auth);
+  sessionStorage.removeItem("currentPage");
   showToast("로그아웃 되었습니다.");
 });
 
@@ -465,14 +475,13 @@ document.getElementById("send-push-btn").addEventListener("click", async () => {
   btn.textContent = "발송 중..."; btn.disabled = true;
 
   try {
-    // ✅ 편집 모드면 이전 알림 먼저 삭제 후 신규 발송
+    // ✅ 편집 모드 — 이전 알림 삭제 후 신규 발송
     if (editingPushId) {
       await deleteDoc(doc(db, "push_history", editingPushId));
       const logsSnap = await getDocs(
         query(collection(db, "notification_logs"), where("pushId", "==", editingPushId))
       );
       await Promise.all(logsSnap.docs.map(d => deleteDoc(d.ref)));
-      editingPushId = null;
     }
 
     await addDoc(collection(db, "push_queue"), {
@@ -545,31 +554,27 @@ async function loadPushHistory() {
   }
 }
 
-// ✅ 편집 버튼 — 발송 폼에 내용 채우기 (이전 알림은 발송 시에만 삭제)
+// ✅ 편집 — 발송 폼에 내용 채우기 (발송 시에만 이전 알림 삭제)
 window.editPush = (pushId, currentTitle, currentBody) => {
   editingPushId = pushId;
   document.getElementById("push-title").value = currentTitle;
   document.getElementById("push-body").value  = currentBody;
 
-  // 발송 버튼 스타일 변경
   const btn = document.getElementById("send-push-btn");
   btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:white;margin-right:6px;vertical-align:middle"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>수정 발송하기`;
   btn.style.background = "#7c3aed";
 
-  // 신규작성(취소) 버튼 표시
   document.getElementById("push-new-btn").classList.remove("hidden");
 
-  // 편집 안내 표시
   const notice = document.getElementById("push-edit-notice");
   notice.classList.remove("hidden");
-  notice.textContent = "✏️ 편집 모드 — 수정 후 발송하면 이전 알림이 삭제되고 새 알림이 발송돼요.";
+  notice.textContent = "✏️ 편집 모드 — 수정 후 발송하면 이전 알림이 삭제되고 새 알림이 발송돼요. 취소하려면 위 버튼을 눌러주세요.";
 
-  // 폼으로 스크롤
   document.getElementById("push-title").scrollIntoView({ behavior: "smooth" });
   document.getElementById("push-title").focus();
 };
 
-// ✅ 삭제 버튼
+// ✅ 삭제
 window.deletePush = async (pushId) => {
   if (!confirm("이 알림을 삭제하시겠습니까?\n수신자의 알림 내역에서도 사라집니다.")) return;
   try {
