@@ -39,10 +39,6 @@ html, body {
   line-height: 1.6;
 }
 
-/* ✅ 로그인 깜빡임 방지 — Firebase 인증 확인 전 숨김 */
-#login-screen { display: none; }
-#app { display: none; }
-
 /* ── 로그인 ── */
 .login-screen {
   min-height: 100vh;
