@@ -39,6 +39,10 @@ html, body {
   line-height: 1.6;
 }
 
+/* ✅ 로그인 깜빡임 방지 — Firebase 인증 확인 전 숨김 */
+#login-screen { display: none; }
+#app { display: none; }
+
 /* ── 로그인 ── */
 .login-screen {
   min-height: 100vh;
@@ -86,7 +90,7 @@ html, body {
 .logo-hex.small { width: 28px; height: 28px; }
 
 /* ── 앱 레이아웃 ── */
-.app { display: flex; height: 100vh; overflow: hidden; }
+.app { height: 100vh; overflow: hidden; }
 .app.hidden { display: none; }
 
 /* ── 사이드바 ── */
@@ -373,8 +377,10 @@ html, body {
   border: 0.5px solid var(--border-light); border-radius: 8px;
   padding: 10px 20px; font-size: 13px; cursor: pointer; font-family: var(--font-body);
   transition: background 0.15s;
+  display: inline-flex; align-items: center; justify-content: center;
 }
 .btn-secondary:hover { background: var(--border); }
+.btn-secondary.full { width: 100%; }
 
 .icon-btn {
   background: none; border: none; color: var(--text-muted);
