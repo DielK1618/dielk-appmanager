@@ -9,7 +9,7 @@ import {
   onAuthStateChanged, updateProfile, updatePassword
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
-  getFirestore, collection, getDocs, addDoc, deleteDoc,
+  getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc,
   doc, query, orderBy, limit, serverTimestamp, getCountFromServer, where
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -27,9 +27,8 @@ const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db   = getFirestore(firebaseApp);
 
-// ── 전역 상태 ────────────────────────────────
-let registeredApps = [];   // Firestore에서 불러온 앱 목록
-let selectedAppId  = "all"; // 현재 선택된 앱 탭
+let registeredApps = [];
+let selectedAppId  = "all";
 
 // ── 유틸 ─────────────────────────────────────
 function showToast(msg) {
@@ -69,22 +68,17 @@ const PAGES_WITH_TABBAR = ["users", "messages", "push"];
 function showPage(pageId) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
-
   const target = document.getElementById("page-" + pageId);
   if (target) target.classList.add("active");
-
   document.querySelectorAll(".nav-item").forEach(n => {
     if (n.dataset.page === pageId) n.classList.add("active");
   });
-
-  // 탭바 표시/숨김
   const tabbar = document.getElementById("app-tabbar");
   if (PAGES_WITH_TABBAR.includes(pageId)) {
     tabbar.classList.remove("hidden");
   } else {
     tabbar.classList.add("hidden");
   }
-
   if (pageId === "dashboard") loadDashboard();
   if (pageId === "apps")      loadApps();
   if (pageId === "users")     loadUsers();
@@ -103,7 +97,6 @@ document.querySelectorAll(".card-link").forEach(link => {
 function renderAppTabs() {
   const container = document.getElementById("app-tabs");
   container.innerHTML = `<button class="app-tab ${selectedAppId === "all" ? "active" : ""}" data-appid="all">전체</button>`;
-
   registeredApps.forEach(a => {
     const btn = document.createElement("button");
     btn.className = "app-tab" + (selectedAppId === a.appId ? " active" : "");
@@ -111,21 +104,17 @@ function renderAppTabs() {
     btn.textContent = a.name;
     container.appendChild(btn);
   });
-
   container.querySelectorAll(".app-tab").forEach(btn => {
     btn.addEventListener("click", () => {
       selectedAppId = btn.dataset.appid;
       container.querySelectorAll(".app-tab").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
-      // 현재 페이지 데이터 다시 로드
       const activePage = document.querySelector(".page.active")?.id?.replace("page-", "");
       if (activePage === "users")    loadUsers();
       if (activePage === "messages") loadMessages();
       if (activePage === "push")     loadPushHistory();
     });
   });
-
-  // 메시지/푸시 발송 셀렉트 업데이트
   updateAppSelects();
 }
 
@@ -148,14 +137,11 @@ onAuthStateChanged(auth, async (user) => {
   if (user) {
     document.getElementById("login-screen").classList.add("hidden");
     document.getElementById("app").classList.remove("hidden");
-
     const name = user.displayName || user.email.split("@")[0];
     document.getElementById("admin-name-display").textContent = name;
     document.getElementById("admin-avatar").textContent = getInitials(user.displayName, user.email);
     document.getElementById("settings-email").value = user.email;
     document.getElementById("settings-name").value  = user.displayName || "";
-
-    // 앱 목록 먼저 로드 후 대시보드
     await loadAppsList();
     showPage("dashboard");
   } else {
@@ -164,7 +150,6 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-// ── 로그인 / 로그아웃 ────────────────────────
 document.getElementById("login-btn").addEventListener("click", async () => {
   const email = document.getElementById("login-email").value.trim();
   const pw    = document.getElementById("login-password").value;
@@ -188,7 +173,7 @@ document.getElementById("logout-btn").addEventListener("click", async () => {
   showToast("로그아웃 되었습니다.");
 });
 
-// ── 앱 목록 불러오기 (전역 캐시) ────────────
+// ── 앱 목록 ──────────────────────────────────
 async function loadAppsList() {
   try {
     const snap = await getDocs(query(collection(db, "registered_apps"), orderBy("createdAt", "asc")));
@@ -196,28 +181,22 @@ async function loadAppsList() {
     snap.forEach(d => registeredApps.push({ id: d.id, ...d.data() }));
     document.getElementById("apps-count").textContent = registeredApps.length;
     renderAppTabs();
-  } catch (e) {
-    console.error("앱 목록 로드 오류:", e);
-  }
+  } catch (e) { console.error("앱 목록 로드 오류:", e); }
 }
 
 // ── 대시보드 ─────────────────────────────────
 async function loadDashboard() {
   try {
     document.getElementById("stat-apps").textContent = registeredApps.length;
-
     const userSnap = await getCountFromServer(collection(db, "users"));
     document.getElementById("stat-users").textContent = userSnap.data().count;
     document.getElementById("users-count").textContent = userSnap.data().count;
-
     const msgSnap = await getCountFromServer(collection(db, "messages"));
     document.getElementById("stat-messages").textContent = msgSnap.data().count;
     document.getElementById("msg-count").textContent = msgSnap.data().count;
-
     const pushSnap = await getCountFromServer(collection(db, "push_history"));
     document.getElementById("stat-pushes").textContent = pushSnap.data().count;
 
-    // 최근 회원
     const recentUsersQ = query(collection(db, "users"), orderBy("createdAt", "desc"), limit(4));
     const recentUsers  = await getDocs(recentUsersQ);
     const ruList = document.getElementById("recent-users-list");
@@ -241,7 +220,6 @@ async function loadDashboard() {
       });
     }
 
-    // 앱 현황 요약
     const appsList = document.getElementById("apps-summary-list");
     if (registeredApps.length === 0) {
       appsList.innerHTML = '<div class="empty-msg">등록된 앱이 없습니다</div>';
@@ -266,12 +244,10 @@ async function loadDashboard() {
         appsList.appendChild(div);
       }
     }
-  } catch (e) {
-    console.error("대시보드 오류:", e);
-  }
+  } catch (e) { console.error("대시보드 오류:", e); }
 }
 
-// ── 앱 관리 페이지 ───────────────────────────
+// ── 앱 관리 ──────────────────────────────────
 async function loadApps() {
   await loadAppsList();
   renderAppsGrid();
@@ -306,8 +282,7 @@ function renderAppsGrid() {
   });
 }
 
-// 앱 추가 폼
-const addAppForm   = document.getElementById("add-app-form");
+const addAppForm = document.getElementById("add-app-form");
 document.getElementById("add-app-btn").addEventListener("click", () => addAppForm.classList.remove("hidden"));
 document.getElementById("add-app-close").addEventListener("click", () => addAppForm.classList.add("hidden"));
 document.getElementById("add-app-cancel").addEventListener("click", () => addAppForm.classList.add("hidden"));
@@ -317,40 +292,28 @@ document.getElementById("save-app-btn").addEventListener("click", async () => {
   const appId = document.getElementById("new-app-id").value.trim().toLowerCase();
   const url   = document.getElementById("new-app-url").value.trim();
   const desc  = document.getElementById("new-app-desc").value.trim();
-
   if (!name || !appId) { showToast("앱 이름과 앱 ID는 필수입니다."); return; }
   if (!/^[a-z0-9-]+$/.test(appId)) { showToast("앱 ID는 영문 소문자, 숫자, 하이픈만 가능합니다."); return; }
   if (registeredApps.find(a => a.appId === appId)) { showToast("이미 사용 중인 앱 ID입니다."); return; }
-
   try {
-    await addDoc(collection(db, "registered_apps"), {
-      name, appId, url, desc, createdAt: serverTimestamp()
-    });
+    await addDoc(collection(db, "registered_apps"), { name, appId, url, desc, createdAt: serverTimestamp() });
     showToast(`"${name}" 앱이 등록되었습니다! ✓`);
     document.getElementById("new-app-name").value = "";
     document.getElementById("new-app-id").value   = "";
     document.getElementById("new-app-url").value  = "";
     document.getElementById("new-app-desc").value = "";
     addAppForm.classList.add("hidden");
-    await loadAppsList();
-    renderAppsGrid();
-    loadDashboard();
-  } catch (e) {
-    showToast("등록 실패: " + e.message);
-  }
+    await loadAppsList(); renderAppsGrid(); loadDashboard();
+  } catch (e) { showToast("등록 실패: " + e.message); }
 });
 
 window.deleteApp = async (docId, name) => {
-  if (!confirm(`"${name}" 앱을 삭제하시겠습니까?\n(앱 데이터는 삭제되지 않습니다)`)) return;
+  if (!confirm(`"${name}" 앱을 삭제하시겠습니까?`)) return;
   try {
     await deleteDoc(doc(db, "registered_apps", docId));
     showToast(`"${name}" 앱이 삭제되었습니다.`);
-    await loadAppsList();
-    renderAppsGrid();
-    loadDashboard();
-  } catch (e) {
-    showToast("삭제 실패: " + e.message);
-  }
+    await loadAppsList(); renderAppsGrid(); loadDashboard();
+  } catch (e) { showToast("삭제 실패: " + e.message); }
 };
 
 // ── 회원 관리 ────────────────────────────────
@@ -360,12 +323,9 @@ async function loadUsers() {
   const tbody = document.getElementById("users-table-body");
   tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">로딩 중...</td></tr>';
   try {
-    let q;
-    if (selectedAppId === "all") {
-      q = query(collection(db, "users"), orderBy("createdAt", "desc"));
-    } else {
-      q = query(collection(db, "users"), where("appId", "==", selectedAppId), orderBy("createdAt", "desc"));
-    }
+    let q = selectedAppId === "all"
+      ? query(collection(db, "users"), orderBy("createdAt", "desc"))
+      : query(collection(db, "users"), where("appId", "==", selectedAppId), orderBy("createdAt", "desc"));
     const snap = await getDocs(q);
     allUsers = [];
     snap.forEach(d => allUsers.push({ id: d.id, ...d.data() }));
@@ -420,12 +380,9 @@ async function loadMessages() {
   const tbody = document.getElementById("messages-table-body");
   tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">로딩 중...</td></tr>';
   try {
-    let q;
-    if (selectedAppId === "all") {
-      q = query(collection(db, "messages"), orderBy("sentAt", "desc"));
-    } else {
-      q = query(collection(db, "messages"), where("appId", "==", selectedAppId), orderBy("sentAt", "desc"));
-    }
+    let q = selectedAppId === "all"
+      ? query(collection(db, "messages"), orderBy("sentAt", "desc"))
+      : query(collection(db, "messages"), where("appId", "==", selectedAppId), orderBy("sentAt", "desc"));
     const snap = await getDocs(q);
     if (snap.empty) {
       tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">메시지가 없습니다</td></tr>';
@@ -459,15 +416,11 @@ document.getElementById("send-message-btn").addEventListener("click", async () =
   const to    = document.getElementById("msg-to").value.trim();
   const title = document.getElementById("msg-title-input").value.trim();
   const body  = document.getElementById("msg-body").value.trim();
-
   if (!title || !body) { showToast("제목과 내용을 입력하세요."); return; }
   try {
     await addDoc(collection(db, "messages"), {
-      appId: appId || "all",
-      to: to || "all",
-      title, body,
-      sentAt: serverTimestamp(),
-      sentBy: auth.currentUser?.email || "master"
+      appId: appId || "all", to: to || "all", title, body,
+      sentAt: serverTimestamp(), sentBy: auth.currentUser?.email || "master"
     });
     showToast("메시지가 발송되었습니다! ✓");
     document.getElementById("msg-to").value = "";
@@ -492,17 +445,13 @@ document.getElementById("send-push-btn").addEventListener("click", async () => {
   const appId = document.getElementById("push-appid").value;
   const title = document.getElementById("push-title").value.trim();
   const body  = document.getElementById("push-body").value.trim();
-
   if (!title || !body) { showToast("제목과 내용을 입력하세요."); return; }
-
   const btn = document.getElementById("send-push-btn");
   btn.textContent = "발송 중..."; btn.disabled = true;
-
   try {
     await addDoc(collection(db, "push_queue"), {
       appId: appId || "all", title, body,
-      status: "pending",
-      createdAt: serverTimestamp(),
+      status: "pending", createdAt: serverTimestamp(),
       sentBy: auth.currentUser?.email || "master"
     });
     await addDoc(collection(db, "push_history"), {
@@ -511,7 +460,7 @@ document.getElementById("send-push-btn").addEventListener("click", async () => {
       sentAt: serverTimestamp(),
       sentBy: auth.currentUser?.email || "master"
     });
-    showToast("푸시 알림이 발송 대기열에 추가되었습니다! ✓");
+    showToast("푸시 알림이 발송되었습니다! ✓");
     document.getElementById("push-title").value = "";
     document.getElementById("push-body").value  = "";
     loadPushHistory(); loadDashboard();
@@ -523,16 +472,14 @@ document.getElementById("send-push-btn").addEventListener("click", async () => {
   }
 });
 
+// ✅ 푸시 알림 발송 내역 — 편집/삭제 기능 추가
 async function loadPushHistory() {
   const list = document.getElementById("push-history-list");
   list.innerHTML = '<div class="empty-msg">로딩 중...</div>';
   try {
-    let q;
-    if (selectedAppId === "all") {
-      q = query(collection(db, "push_history"), orderBy("sentAt", "desc"), limit(20));
-    } else {
-      q = query(collection(db, "push_history"), where("appId","==", selectedAppId), orderBy("sentAt","desc"), limit(20));
-    }
+    let q = selectedAppId === "all"
+      ? query(collection(db, "push_history"), orderBy("sentAt", "desc"), limit(30))
+      : query(collection(db, "push_history"), where("appId","==", selectedAppId), orderBy("sentAt","desc"), limit(30));
     const snap = await getDocs(q);
     if (snap.empty) { list.innerHTML = '<div class="empty-msg">발송 내역이 없습니다</div>'; return; }
     list.innerHTML = "";
@@ -540,13 +487,20 @@ async function loadPushHistory() {
       const p   = d.data();
       const div = document.createElement("div");
       div.className = "list-item";
+      div.style.cssText = "flex-direction:column; align-items:stretch; gap:8px;";
       div.innerHTML = `
-        <div class="item-info">
-          <div class="item-name">${p.title || "(제목 없음)"}</div>
-          <div class="item-sub">${p.body || ""}</div>
-          <div class="item-sub" style="margin-top:3px">
-            <span class="app-tag" style="font-size:10px">${getAppName(p.appId)}</span>
-            · ${formatDateTime(p.sentAt)}
+        <div style="display:flex; align-items:flex-start; gap:10px;">
+          <div class="item-info">
+            <div class="item-name">${p.title || "(제목 없음)"}</div>
+            <div class="item-sub">${p.body || ""}</div>
+            <div class="item-sub" style="margin-top:3px">
+              <span class="app-tag" style="font-size:10px">${getAppName(p.appId)}</span>
+              · ${formatDateTime(p.sentAt)}
+            </div>
+          </div>
+          <div style="display:flex; gap:6px; flex-shrink:0; margin-top:2px;">
+            <button class="btn-sm" onclick="editPush('${d.id}', '${(p.title||'').replace(/'/g,"\\'")}', '${(p.body||'').replace(/'/g,"\\'")}')">편집</button>
+            <button class="btn-sm danger" onclick="deletePush('${d.id}')">삭제</button>
           </div>
         </div>
       `;
@@ -556,6 +510,57 @@ async function loadPushHistory() {
     list.innerHTML = `<div class="empty-msg">오류: ${e.message}</div>`;
   }
 }
+
+// ✅ 푸시 알림 편집
+window.editPush = async (pushId, currentTitle, currentBody) => {
+  const newTitle = prompt("새 제목을 입력하세요:", currentTitle);
+  if (newTitle === null) return;
+  const newBody = prompt("새 내용을 입력하세요:", currentBody);
+  if (newBody === null) return;
+  if (!newTitle.trim() || !newBody.trim()) { showToast("제목과 내용을 입력하세요."); return; }
+
+  try {
+    // push_history 업데이트
+    await updateDoc(doc(db, "push_history", pushId), {
+      title: newTitle.trim(),
+      body: newBody.trim(),
+      editedAt: serverTimestamp()
+    });
+
+    // ✅ 읽음 기록 삭제 → 모든 수신자 안읽음 처리
+    const logsSnap = await getDocs(
+      query(collection(db, "notification_logs"), where("pushId", "==", pushId))
+    );
+    const deletePromises = logsSnap.docs.map(d => deleteDoc(d.ref));
+    await Promise.all(deletePromises);
+
+    showToast("알림이 편집되었습니다. 수신자 안읽음 처리 완료! ✓");
+    loadPushHistory();
+  } catch (e) {
+    showToast("편집 실패: " + e.message);
+  }
+};
+
+// ✅ 푸시 알림 삭제
+window.deletePush = async (pushId) => {
+  if (!confirm("이 알림을 삭제하시겠습니까?\n수신자의 알림 내역에서도 사라집니다.")) return;
+  try {
+    // push_history 삭제
+    await deleteDoc(doc(db, "push_history", pushId));
+
+    // notification_logs에서도 삭제
+    const logsSnap = await getDocs(
+      query(collection(db, "notification_logs"), where("pushId", "==", pushId))
+    );
+    const deletePromises = logsSnap.docs.map(d => deleteDoc(d.ref));
+    await Promise.all(deletePromises);
+
+    showToast("알림이 삭제되었습니다. ✓");
+    loadPushHistory(); loadDashboard();
+  } catch (e) {
+    showToast("삭제 실패: " + e.message);
+  }
+};
 
 // ── 설정 ─────────────────────────────────────
 document.getElementById("save-settings-btn").addEventListener("click", async () => {
