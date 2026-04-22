@@ -88,7 +88,7 @@
     <!-- 콘텐츠 -->
     <main class="content">
 
-      <!-- 앱 탭바 (회원/메시지/푸시 페이지에서 표시) -->
+      <!-- 앱 탭바 -->
       <div id="app-tabbar" class="app-tabbar hidden">
         <span class="tabbar-label">앱 선택</span>
         <div id="app-tabs" class="app-tabs">
@@ -282,6 +282,10 @@
         <div class="two-col">
           <div class="card">
             <div class="card-header"><span class="card-title">알림 보내기</span></div>
+
+            <!-- ✅ 편집 안내 메시지 -->
+            <p id="push-edit-notice" class="hidden" style="font-size:12px; color:#b466ff; margin-bottom:12px; padding:10px 12px; background:rgba(180,102,255,0.1); border-radius:8px; line-height:1.5;"></p>
+
             <div class="form-group">
               <label>발송 앱</label>
               <select id="push-appid"><option value="all">전체 앱</option></select>
@@ -294,11 +298,19 @@
               <label>알림 내용</label>
               <textarea id="push-body" rows="3" placeholder="알림 내용을 입력하세요..."></textarea>
             </div>
-            <div class="form-actions">
+            <div class="form-actions" style="flex-direction:column; gap:8px;">
+
+              <!-- ✅ 신규 작성 / 편집 취소 버튼 (편집 모드일 때만 표시) -->
+              <button id="push-new-btn" class="btn-secondary full hidden">
+                ✕ 편집 취소 / 새로 작성
+              </button>
+
+              <!-- 발송 버튼 -->
               <button class="btn-primary full" id="send-push-btn">
                 <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:white;margin-right:6px;vertical-align:middle"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
                 발송하기
               </button>
+
             </div>
           </div>
           <div class="card">
