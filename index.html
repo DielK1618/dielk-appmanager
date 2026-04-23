@@ -214,119 +214,63 @@
         </div>
       </section>
 
-      <!-- 메시지 -->
-      <section class="page" id="page-messages">
-        <div class="page-header">
-          <h1>메시지</h1>
-          <button class="btn-primary" id="compose-btn">+ 새 메시지 작성</button>
-        </div>
-        <div class="card compose-form hidden" id="compose-form">
-          <div class="card-header">
-            <span class="card-title">새 메시지 작성</span>
-            <button class="icon-btn" id="compose-close">✕</button>
-          </div>
-          <div class="form-group">
-            <label>발송 앱</label>
-            <select id="msg-appid"><option value="all">전체 앱</option></select>
-          </div>
-          <div class="form-group">
-            <label>받는 사람</label>
-            <input type="text" id="msg-to" placeholder="전체: all / 특정 이메일 입력" />
-          </div>
-          <div class="form-group">
-            <label>제목</label>
-            <input type="text" id="msg-title-input" placeholder="메시지 제목" />
-          </div>
-          <div class="form-group">
-            <label>내용</label>
-            <textarea id="msg-body" rows="4" placeholder="메시지 내용을 입력하세요..."></textarea>
-          </div>
-          <div class="form-actions">
-            <button class="btn-secondary" id="compose-cancel">취소</button>
-            <button class="btn-primary" id="send-message-btn">발송하기</button>
-          </div>
-        </div>
-        <div class="card">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>제목</th><th>앱</th><th>받는 사람</th>
-                <th>보낸 시간</th><th>작업</th>
-              </tr>
-            </thead>
-            <tbody id="messages-table-body">
-              <tr><td colspan="5" class="empty-msg">로딩 중...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+<!-- 메시지 -->
+<section class="page" id="page-messages">
+  <div class="page-header">
+    <h1>메시지</h1>
+  </div>
 
-      <!-- 푸시 알림 -->
-      <section class="page" id="page-push">
-        <div class="page-header">
-          <h1>푸시 알림</h1>
-        </div>
+  <!-- 채팅 레이아웃 -->
+  <div class="chat-layout">
 
-        <!-- 알림 보내기 -->
-        <div class="card">
-          <div class="card-header"><span class="card-title">알림 보내기</span></div>
-          <p id="push-edit-notice" class="hidden" style="font-size:12px; color:#b466ff; margin-bottom:12px; padding:10px 12px; background:rgba(180,102,255,0.1); border-radius:8px; line-height:1.5;"></p>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-            <div class="form-group" style="margin-bottom:0">
-              <label>발송 앱</label>
-              <select id="push-appid"><option value="all">전체 앱</option></select>
-            </div>
-            <div class="form-group" style="margin-bottom:0">
-              <label>알림 제목</label>
-              <input type="text" id="push-title" placeholder="알림 제목을 입력하세요" />
+    <!-- 왼쪽: 대화 상대 목록 -->
+    <div class="chat-sidebar">
+      <div class="chat-sidebar-header">
+        <input type="text" id="chat-search" placeholder="이름 또는 이메일 검색..." class="chat-search-input" />
+      </div>
+      <div id="chat-user-list" class="chat-user-list">
+        <div class="empty-msg">로딩 중...</div>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 채팅창 -->
+    <div class="chat-main">
+
+      <!-- 대화 상대 선택 전 -->
+      <div id="chat-empty-state" class="chat-empty-state">
+        <div style="font-size:40px; margin-bottom:12px;">💬</div>
+        <div style="color:var(--text-muted); font-size:14px;">대화 상대를 선택해주세요</div>
+      </div>
+
+      <!-- 채팅 내용 -->
+      <div id="chat-room" class="chat-room hidden">
+
+        <!-- 채팅 상단바 -->
+        <div class="chat-topbar">
+          <div class="chat-topbar-info">
+            <div class="avatar" id="chat-user-avatar" style="width:34px;height:34px;font-size:12px;">?</div>
+            <div>
+              <div class="chat-topbar-name" id="chat-user-name">—</div>
+              <div class="chat-topbar-email" id="chat-user-email">—</div>
             </div>
           </div>
-          <div class="form-group" style="margin-top:12px;">
-            <label>알림 내용</label>
-            <textarea id="push-body" rows="2" placeholder="알림 내용을 입력하세요..."></textarea>
-          </div>
-          <div class="form-actions" style="flex-direction:column; gap:8px;">
-            <button id="push-new-btn" class="btn-secondary full hidden">✕ 편집 취소 / 새로 작성</button>
-            <button class="btn-primary full" id="send-push-btn">
-              <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:white;margin-right:6px;vertical-align:middle"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-              발송하기
-            </button>
-          </div>
         </div>
 
-        <!-- 발송 내역 테이블 -->
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">발송 내역</span>
-            <span id="push-total-count" style="font-size:11px; color:var(--text-muted);">전체 0건</span>
-          </div>
-          <!-- 검색 필터 -->
-          <div style="display:flex; gap:10px; margin-bottom:14px; flex-wrap:wrap; align-items:center;">
-            <input type="text" id="push-search" class="search-input" style="flex:1; min-width:160px; width:auto;" placeholder="제목 또는 내용 검색..." />
-            <input type="date" id="push-date-from" style="background:var(--bg-primary); border:0.5px solid var(--border-light); border-radius:8px; padding:8px 10px; font-size:12px; color:var(--text-primary); outline:none; font-family:var(--font-body);" />
-            <span style="color:var(--text-muted); font-size:12px;">~</span>
-            <input type="date" id="push-date-to" style="background:var(--bg-primary); border:0.5px solid var(--border-light); border-radius:8px; padding:8px 10px; font-size:12px; color:var(--text-primary); outline:none; font-family:var(--font-body);" />
-            <button id="push-search-btn" class="btn-sm">🔍 검색</button>
-            <button id="push-reset-btn" class="btn-sm">초기화</button>
-          </div>
-          <!-- 테이블 -->
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width:36px;">#</th>
-                <th style="width:180px;">제목</th>
-                <th>내용</th>
-                <th style="width:80px;">앱</th>
-                <th style="width:110px;">발송 일시</th>
-                <th style="width:90px;">작업</th>
-              </tr>
-            </thead>
-            <tbody id="push-history-tbody">
-              <tr><td colspan="6" class="empty-msg">로딩 중...</td></tr>
-            </tbody>
-          </table>
+        <!-- 메시지 목록 -->
+        <div id="chat-messages" class="chat-messages"></div>
+
+        <!-- 입력창 -->
+        <div class="chat-input-area">
+          <input type="text" id="chat-input" placeholder="메시지를 입력하세요..." class="chat-input" />
+          <button id="chat-send-btn" class="chat-send-btn">
+            <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+          </button>
         </div>
-      </section>
+      </div>
+
+    </div>
+  </div>
+</section>
 
       <!-- 설정 -->
       <section class="page" id="page-settings">
