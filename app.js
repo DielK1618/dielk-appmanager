@@ -402,71 +402,196 @@ window.deleteUser = async (userId) => {
   } catch (e) { showToast("삭제 실패: " + e.message); }
 };
 
-// ── 메시지 ───────────────────────────────────
+// ── 메시지 채팅 UI ────────────────────────────
+let allMessages = [];
+let chatUsers = [];
+let selectedChatUser = null;
+
 async function loadMessages() {
-  const tbody = document.getElementById("messages-table-body");
-  tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">로딩 중...</td></tr>';
+  const userList = document.getElementById("chat-user-list");
+  userList.innerHTML = '<div class="empty-msg">로딩 중...</div>';
   try {
-    let q = selectedAppId === "all"
-      ? query(collection(db, "messages"), orderBy("sentAt", "desc"))
-      : query(collection(db, "messages"), where("appId", "==", selectedAppId), orderBy("sentAt", "desc"));
+    // 모든 메시지 불러오기
+    const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
     const snap = await getDocs(q);
-    if (snap.empty) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">메시지가 없습니다</td></tr>';
-      return;
-    }
-    tbody.innerHTML = "";
-    snap.forEach(d => {
-      const m  = d.data();
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td><strong style="color:var(--text-heading)">${m.title || "(제목 없음)"}</strong></td>
-        <td><span class="app-tag">${getAppName(m.appId)}</span></td>
-        <td style="color:var(--text-muted)">${m.to || "전체"}</td>
-        <td style="color:var(--text-muted)">${formatDateTime(m.sentAt)}</td>
-        <td><button class="btn-sm danger" onclick="deleteMessage('${d.id}')">삭제</button></td>
-      `;
-      tbody.appendChild(tr);
-    });
+    allMessages = [];
+    snap.forEach(d => allMessages.push({ id: d.id, ...d.data() }));
+
+    // 대화 상대 목록 생성 (senderEmail 기준 그룹화)
+    buildChatUserList(allMessages);
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-msg">오류: ${e.message}</td></tr>`;
+    userList.innerHTML = `<div class="empty-msg">오류: ${e.message}</div>`;
   }
 }
 
-const composeForm = document.getElementById("compose-form");
-document.getElementById("compose-btn").addEventListener("click", () => composeForm.classList.remove("hidden"));
-document.getElementById("compose-close").addEventListener("click", () => composeForm.classList.add("hidden"));
-document.getElementById("compose-cancel").addEventListener("click", () => composeForm.classList.add("hidden"));
+function buildChatUserList(messages) {
+  // 사용자별 마지막 메시지와 안읽음 수 계산
+  const userMap = {};
+  messages.forEach(m => {
+    const email = m.isFromMaster ? null : m.senderEmail;
+    if (!email) return;
+    if (!userMap[email]) {
+      userMap[email] = {
+        email,
+        senderId: m.senderId,
+        lastMsg: m,
+        lastTime: m.timestamp,
+        count: 0
+      };
+    } else {
+      if (m.timestamp > userMap[email].lastTime) {
+        userMap[email].lastMsg = m;
+        userMap[email].lastTime = m.timestamp;
+      }
+    }
+    userMap[email].count++;
+  });
 
-document.getElementById("send-message-btn").addEventListener("click", async () => {
-  const appId = document.getElementById("msg-appid").value;
-  const to    = document.getElementById("msg-to").value.trim();
-  const title = document.getElementById("msg-title-input").value.trim();
-  const body  = document.getElementById("msg-body").value.trim();
-  if (!title || !body) { showToast("제목과 내용을 입력하세요."); return; }
-  try {
-    await addDoc(collection(db, "messages"), {
-      appId: appId || "all", to: to || "all", title, body,
-      sentAt: serverTimestamp(), sentBy: auth.currentUser?.email || "master"
-    });
-    showToast("메시지가 발송되었습니다! ✓");
-    document.getElementById("msg-to").value = "";
-    document.getElementById("msg-title-input").value = "";
-    document.getElementById("msg-body").value = "";
-    composeForm.classList.add("hidden");
-    loadMessages(); loadDashboard();
-  } catch (e) { showToast("발송 실패: " + e.message); }
+  chatUsers = Object.values(userMap).sort((a, b) => b.lastTime - a.lastTime);
+  renderChatUserList(chatUsers);
+}
+
+function renderChatUserList(users) {
+  const list = document.getElementById("chat-user-list");
+  if (users.length === 0) {
+    list.innerHTML = '<div class="empty-msg">대화 상대가 없습니다</div>';
+    return;
+  }
+  list.innerHTML = "";
+  users.forEach(u => {
+    const div = document.createElement("div");
+    div.className = "chat-user-item" + (selectedChatUser?.email === u.email ? " active" : "");
+    div.dataset.email = u.email;
+
+    const initials = getInitials(null, u.email);
+    const time = u.lastTime ? new Date(u.lastTime).toLocaleString("ko-KR", { month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" }) : "";
+    const preview = u.lastMsg?.text || "";
+
+    div.innerHTML = `
+      <div class="avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0;">${initials}</div>
+      <div class="chat-user-info">
+        <div class="chat-user-name-text">${u.email}</div>
+        <div class="chat-user-preview">${preview}</div>
+      </div>
+      <div class="chat-user-meta">
+        <div class="chat-user-time">${time}</div>
+      </div>
+    `;
+    div.addEventListener("click", () => openChat(u));
+    list.appendChild(div);
+  });
+}
+
+function openChat(user) {
+  selectedChatUser = user;
+
+  // 사용자 목록 활성화 표시
+  document.querySelectorAll(".chat-user-item").forEach(el => {
+    el.classList.toggle("active", el.dataset.email === user.email);
+  });
+
+  // 채팅방 표시
+  document.getElementById("chat-empty-state").classList.add("hidden");
+  document.getElementById("chat-room").classList.remove("hidden");
+
+  // 상단 정보
+  document.getElementById("chat-user-avatar").textContent = getInitials(null, user.email);
+  document.getElementById("chat-user-name").textContent = user.email.split("@")[0];
+  document.getElementById("chat-user-email").textContent = user.email;
+
+  // 해당 사용자의 메시지만 필터링
+  const userMessages = allMessages.filter(m =>
+    m.senderEmail === user.email || m.isFromMaster
+  );
+
+  renderChatMessages(userMessages, user.email);
+}
+
+function renderChatMessages(messages, userEmail) {
+  const container = document.getElementById("chat-messages");
+  container.innerHTML = "";
+
+  let lastDate = "";
+
+  messages.forEach(m => {
+    const date = m.timestamp ? new Date(m.timestamp).toLocaleDateString("ko-KR", { year:"numeric", month:"long", day:"numeric" }) : "";
+    const time = m.timestamp ? new Date(m.timestamp).toLocaleTimeString("ko-KR", { hour:"2-digit", minute:"2-digit" }) : "";
+    const isMaster = m.isFromMaster;
+
+    // 날짜 구분선
+    if (date && date !== lastDate) {
+      lastDate = date;
+      const divider = document.createElement("div");
+      divider.className = "chat-date-divider";
+      divider.textContent = date;
+      container.appendChild(divider);
+    }
+
+    const msgEl = document.createElement("div");
+    msgEl.className = `chat-msg ${isMaster ? "master" : "user"}`;
+
+    const avatarText = isMaster ? "나" : getInitials(null, m.senderEmail || "?");
+
+    msgEl.innerHTML = `
+      <div class="chat-msg-avatar">${avatarText}</div>
+      <div class="chat-msg-content">
+        <div class="chat-msg-bubble">${m.text || ""}</div>
+        <div class="chat-msg-time">${time}</div>
+      </div>
+    `;
+    container.appendChild(msgEl);
+  });
+
+  // 맨 아래로 스크롤
+  container.scrollTop = container.scrollHeight;
+}
+
+// 메시지 전송
+document.getElementById("chat-send-btn").addEventListener("click", sendChatMessage);
+document.getElementById("chat-input").addEventListener("keydown", e => {
+  if (e.key === "Enter") sendChatMessage();
 });
 
-window.deleteMessage = async (msgId) => {
-  if (!confirm("이 메시지를 삭제하시겠습니까?")) return;
-  try {
-    await deleteDoc(doc(db, "messages", msgId));
-    showToast("메시지가 삭제되었습니다.");
-    loadMessages(); loadDashboard();
-  } catch (e) { showToast("삭제 실패: " + e.message); }
-};
+async function sendChatMessage() {
+  if (!selectedChatUser) return;
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if (!text) return;
 
+  try {
+    const newMsg = {
+      text,
+      senderId: auth.currentUser?.uid || "master",
+      senderEmail: auth.currentUser?.email || "master",
+      isFromMaster: true,
+      timestamp: Date.now()
+    };
+    await addDoc(collection(db, "messages"), newMsg);
+
+    // 로컬에도 추가해서 바로 표시
+    allMessages.push({ id: Date.now().toString(), ...newMsg });
+    input.value = "";
+
+    // 채팅창 새로고침
+    const userMessages = allMessages.filter(m =>
+      m.senderEmail === selectedChatUser.email || m.isFromMaster
+    );
+    renderChatMessages(userMessages, selectedChatUser.email);
+    buildChatUserList(allMessages);
+
+    showToast("메시지 전송 완료! ✓");
+    loadDashboard();
+  } catch (e) {
+    showToast("전송 실패: " + e.message);
+  }
+}
+
+// 채팅 검색
+document.getElementById("chat-search").addEventListener("input", e => {
+  const kw = e.target.value.toLowerCase();
+  const filtered = chatUsers.filter(u => u.email.toLowerCase().includes(kw));
+  renderChatUserList(filtered);
+});
 // ── 푸시 알림 발송 ────────────────────────────
 document.getElementById("send-push-btn").addEventListener("click", async () => {
   const appId = document.getElementById("push-appid").value;
