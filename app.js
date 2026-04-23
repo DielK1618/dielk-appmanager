@@ -1,6 +1,5 @@
 // =============================================
 // DielK Vault Master Console — app.js
-// 멀티앱 통합 관리 버전
 // =============================================
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -10,7 +9,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import {
   getFirestore, collection, getDocs, addDoc, deleteDoc, updateDoc,
-  doc, query, orderBy, limit, serverTimestamp, getCountFromServer, where, onSnapshot
+  doc, getDoc, setDoc, query, orderBy, limit, serverTimestamp,
+  getCountFromServer, where, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -26,14 +26,15 @@ const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
 const db   = getFirestore(firebaseApp);
 
-let registeredApps = [];
-let selectedAppId  = "all";
-let editingPushId  = null;
-let allPushHistory = [];
-let allMessages    = [];
-let chatUsers      = [];
-let selectedChatUser   = null;
+let registeredApps  = [];
+let selectedAppId   = "all";
+let editingPushId   = null;
+let allPushHistory  = [];
+let allMessages     = [];
+let chatUsers       = [];
+let selectedChatUser    = null;
 let messagesUnsubscribe = null;
+let masterEmail     = "modest1440@gmail.com"; // 기본값, Firestore에서 덮어씀
 
 // ── 유틸 ─────────────────────────────────────
 function showToast(msg) {
@@ -65,6 +66,18 @@ function getAppName(appId) {
   if (appId === "all") return "전체";
   const found = registeredApps.find(a => a.appId === appId);
   return found ? found.name : appId;
+}
+
+// ── 마스터 이메일 로드 ────────────────────────
+async function loadMasterEmail() {
+  try {
+    const snap = await getDoc(doc(db, "app_config", "master"));
+    if (snap.exists()) {
+      masterEmail = snap.data().masterEmail || masterEmail;
+      const el = document.getElementById("settings-master-email");
+      if (el) el.value = masterEmail;
+    }
+  } catch (e) { console.error("마스터 이메일 로드 오류:", e); }
 }
 
 // ── 발송 폼 초기화 ───────────────────────────
@@ -102,6 +115,7 @@ function showPage(pageId) {
   if (pageId === "users")     loadUsers();
   if (pageId === "messages")  loadMessages();
   if (pageId === "push")      loadPushHistory();
+  if (pageId === "settings")  loadSettingsPage();
 }
 
 document.querySelectorAll(".nav-item").forEach(item => {
@@ -162,6 +176,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById("settings-email").value = user.email;
     document.getElementById("settings-name").value  = user.displayName || "";
 
+    await loadMasterEmail();
     await loadAppsList();
 
     document.querySelectorAll(".page").forEach(p => p.style.animation = "none");
@@ -416,7 +431,6 @@ function loadMessages() {
     messagesUnsubscribe = null;
   }
 
-  // ✅ 실시간 리스너
   messagesUnsubscribe = onSnapshot(
     collection(db, "messages"),
     (snap) => {
@@ -430,11 +444,8 @@ function loadMessages() {
       }
       buildChatUserList(allMessages);
 
-      // ✅ 현재 열린 채팅방 실시간 갱신
       if (selectedChatUser) {
-        const userMessages = allMessages.filter(m =>
-          m.senderEmail === selectedChatUser.email || m.isFromMaster
-        );
+        const userMessages = filterMessagesForUser(selectedChatUser.email);
         renderChatMessages(userMessages, selectedChatUser.email);
       }
     },
@@ -442,6 +453,17 @@ function loadMessages() {
       userList.innerHTML = `<div class="empty-msg">오류: ${error.message}</div>`;
     }
   );
+}
+
+function filterMessagesForUser(userEmail) {
+  return allMessages.filter(m => {
+    if (!m.isFromMaster) {
+      return m.senderEmail === userEmail;
+    } else {
+      if (m.chatUserEmail) return m.chatUserEmail === userEmail;
+      return false;
+    }
+  });
 }
 
 function buildChatUserList(messages) {
@@ -452,10 +474,9 @@ function buildChatUserList(messages) {
     if (!userMap[email]) {
       userMap[email] = {
         email,
-        senderId: m.senderId,
+        senderId: m.senderId || "",
         lastMsg: m,
-        lastTime: m.timestamp || 0,
-        count: 0
+        lastTime: m.timestamp || 0
       };
     } else {
       if ((m.timestamp || 0) > userMap[email].lastTime) {
@@ -463,7 +484,6 @@ function buildChatUserList(messages) {
         userMap[email].lastTime = m.timestamp || 0;
       }
     }
-    userMap[email].count++;
   });
 
   chatUsers = Object.values(userMap).sort((a, b) => b.lastTime - a.lastTime);
@@ -481,11 +501,11 @@ function renderChatUserList(users) {
     const div = document.createElement("div");
     div.className = "chat-user-item" + (selectedChatUser?.email === u.email ? " active" : "");
     div.dataset.email = u.email;
-
     const initials = getInitials(null, u.email);
-    const time = u.lastTime ? new Date(u.lastTime).toLocaleString("ko-KR", { month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" }) : "";
+    const time = u.lastTime
+      ? new Date(u.lastTime).toLocaleString("ko-KR", { month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" })
+      : "";
     const preview = u.lastMsg?.text || "";
-
     div.innerHTML = `
       <div class="avatar" style="width:36px;height:36px;font-size:13px;flex-shrink:0;">${initials}</div>
       <div class="chat-user-info">
@@ -503,30 +523,21 @@ function renderChatUserList(users) {
 
 function openChat(user) {
   selectedChatUser = user;
-
   document.querySelectorAll(".chat-user-item").forEach(el => {
     el.classList.toggle("active", el.dataset.email === user.email);
   });
-
   document.getElementById("chat-empty-state").classList.add("hidden");
   document.getElementById("chat-room").classList.remove("hidden");
-
   document.getElementById("chat-user-avatar").textContent = getInitials(null, user.email);
   document.getElementById("chat-user-name").textContent = user.email.split("@")[0];
   document.getElementById("chat-user-email").textContent = user.email;
-
-  const userMessages = allMessages.filter(m =>
-    m.senderEmail === user.email || m.isFromMaster
-  );
+  const userMessages = filterMessagesForUser(user.email);
   renderChatMessages(userMessages, user.email);
 }
 
 function renderChatMessages(messages, userEmail) {
   const container = document.getElementById("chat-messages");
-  const prevScrollTop = container.scrollTop;
-  const prevScrollHeight = container.scrollHeight;
-  const isAtBottom = prevScrollHeight - prevScrollTop - container.clientHeight < 60;
-
+  const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 60;
   container.innerHTML = "";
   let lastDate = "";
 
@@ -550,7 +561,6 @@ function renderChatMessages(messages, userEmail) {
     const msgEl = document.createElement("div");
     msgEl.className = `chat-msg ${isMaster ? "master" : "user"}`;
     const avatarText = isMaster ? "나" : getInitials(null, m.senderEmail || "?");
-
     msgEl.innerHTML = `
       <div class="chat-msg-avatar">${avatarText}</div>
       <div class="chat-msg-content">
@@ -561,10 +571,7 @@ function renderChatMessages(messages, userEmail) {
     container.appendChild(msgEl);
   });
 
-  // ✅ 새 메시지면 맨 아래로, 아니면 위치 유지
-  if (isAtBottom) {
-    container.scrollTop = container.scrollHeight;
-  }
+  if (isAtBottom) container.scrollTop = container.scrollHeight;
 }
 
 document.getElementById("chat-send-btn").addEventListener("click", sendChatMessage);
@@ -577,18 +584,16 @@ async function sendChatMessage() {
   const input = document.getElementById("chat-input");
   const text = input.value.trim();
   if (!text) return;
-
   try {
     await addDoc(collection(db, "messages"), {
       text,
       senderId: auth.currentUser?.uid || "master",
       senderEmail: auth.currentUser?.email || "master",
       isFromMaster: true,
+      chatUserEmail: selectedChatUser.email,
       timestamp: Date.now()
     });
     input.value = "";
-
-    // ✅ FCM 푸시 알림 발송
     await addDoc(collection(db, "push_queue"), {
       appId: "dielk-vault",
       title: "새 메시지",
@@ -598,10 +603,7 @@ async function sendChatMessage() {
       sentBy: auth.currentUser?.email || "master",
       type: "message"
     });
-
-  } catch (e) {
-    showToast("전송 실패: " + e.message);
-  }
+  } catch (e) { showToast("전송 실패: " + e.message); }
 }
 
 document.getElementById("chat-search").addEventListener("input", e => {
@@ -621,22 +623,18 @@ document.getElementById("chat-new-btn").addEventListener("click", () => {
   openChat(fakeUser);
 });
 
-// ── 푸시 알림 발송 ────────────────────────────
+// ── 푸시 알림 ────────────────────────────────
 document.getElementById("send-push-btn").addEventListener("click", async () => {
   const appId = document.getElementById("push-appid").value;
   const title = document.getElementById("push-title").value.trim();
   const body  = document.getElementById("push-body").value.trim();
   if (!title || !body) { showToast("제목과 내용을 입력하세요."); return; }
-
   const btn = document.getElementById("send-push-btn");
   btn.textContent = "발송 중..."; btn.disabled = true;
-
   try {
     if (editingPushId) {
       await deleteDoc(doc(db, "push_history", editingPushId));
-      const logsSnap = await getDocs(
-        query(collection(db, "notification_logs"), where("pushId", "==", editingPushId))
-      );
+      const logsSnap = await getDocs(query(collection(db, "notification_logs"), where("pushId", "==", editingPushId)));
       await Promise.all(logsSnap.docs.map(d => deleteDoc(d.ref)));
     }
     await addDoc(collection(db, "push_queue"), {
@@ -653,12 +651,10 @@ document.getElementById("send-push-btn").addEventListener("click", async () => {
     showToast(editingPushId ? "수정 발송 완료! ✓" : "푸시 알림이 발송되었습니다! ✓");
     resetPushForm();
     loadPushHistory(); loadDashboard();
-  } catch (e) {
-    showToast("발송 실패: " + e.message);
-  } finally {
+  } catch (e) { showToast("발송 실패: " + e.message); }
+  finally {
     btn.innerHTML = `<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:white;margin-right:6px;vertical-align:middle"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>발송하기`;
-    btn.style.background = "";
-    btn.disabled = false;
+    btn.style.background = ""; btn.disabled = false;
   }
 });
 
@@ -667,7 +663,6 @@ document.getElementById("push-new-btn").addEventListener("click", () => {
   showToast("새 알림 작성 모드입니다.");
 });
 
-// ── 푸시 발송 내역 ────────────────────────────
 async function loadPushHistory() {
   const tbody = document.getElementById("push-history-tbody");
   tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">로딩 중...</td></tr>';
@@ -694,22 +689,14 @@ function renderPushHistory(list) {
   }
   tbody.innerHTML = list.map((p, i) => `
     <tr>
-      <td style="color:var(--text-muted); text-align:center;">${i + 1}</td>
-      <td>
-        <div style="font-weight:500; color:var(--text-heading); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px;">
-          ${p.title || "(제목 없음)"}
-        </div>
-      </td>
-      <td>
-        <div style="color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:300px;">
-          ${p.body || "—"}
-        </div>
-      </td>
+      <td style="color:var(--text-muted);text-align:center;">${i + 1}</td>
+      <td><div style="font-weight:500;color:var(--text-heading);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;">${p.title || "(제목 없음)"}</div></td>
+      <td><div style="color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px;">${p.body || "—"}</div></td>
       <td><span class="app-tag">${getAppName(p.appId)}</span></td>
-      <td style="color:var(--text-muted); font-size:12px; white-space:nowrap;">${formatDateTime(p.sentAt)}</td>
+      <td style="color:var(--text-muted);font-size:12px;white-space:nowrap;">${formatDateTime(p.sentAt)}</td>
       <td>
-        <div style="display:flex; gap:4px;">
-          <button class="btn-sm" onclick="editPush('${p.id}', '${(p.title||'').replace(/'/g,"\\'")}', '${(p.body||'').replace(/'/g,"\\'")}')">편집</button>
+        <div style="display:flex;gap:4px;">
+          <button class="btn-sm" onclick="editPush('${p.id}','${(p.title||'').replace(/'/g,"\\'")}','${(p.body||'').replace(/'/g,"\\'")}')">편집</button>
           <button class="btn-sm danger" onclick="deletePush('${p.id}')">삭제</button>
         </div>
       </td>
@@ -727,16 +714,8 @@ function filterPushHistory() {
     if (keyword && !titleMatch && !bodyMatch) return false;
     if (dateFrom || dateTo) {
       const sentDate = p.sentAt?.toDate ? p.sentAt.toDate() : new Date(p.sentAt);
-      if (dateFrom) {
-        const from = new Date(dateFrom);
-        from.setHours(0, 0, 0, 0);
-        if (sentDate < from) return false;
-      }
-      if (dateTo) {
-        const to = new Date(dateTo);
-        to.setHours(23, 59, 59, 999);
-        if (sentDate > to) return false;
-      }
+      if (dateFrom) { const from = new Date(dateFrom); from.setHours(0,0,0,0); if (sentDate < from) return false; }
+      if (dateTo)   { const to   = new Date(dateTo);   to.setHours(23,59,59,999); if (sentDate > to) return false; }
     }
     return true;
   });
@@ -744,9 +723,7 @@ function filterPushHistory() {
 }
 
 document.getElementById("push-search-btn").addEventListener("click", filterPushHistory);
-document.getElementById("push-search").addEventListener("keydown", e => {
-  if (e.key === "Enter") filterPushHistory();
-});
+document.getElementById("push-search").addEventListener("keydown", e => { if (e.key === "Enter") filterPushHistory(); });
 document.getElementById("push-reset-btn").addEventListener("click", () => {
   document.getElementById("push-search").value = "";
   document.getElementById("push-date-from").value = "";
@@ -773,9 +750,7 @@ window.deletePush = async (pushId) => {
   if (!confirm("이 알림을 삭제하시겠습니까?\n수신자의 알림 내역에서도 사라집니다.")) return;
   try {
     await deleteDoc(doc(db, "push_history", pushId));
-    const logsSnap = await getDocs(
-      query(collection(db, "notification_logs"), where("pushId", "==", pushId))
-    );
+    const logsSnap = await getDocs(query(collection(db, "notification_logs"), where("pushId", "==", pushId)));
     await Promise.all(logsSnap.docs.map(d => deleteDoc(d.ref)));
     showToast("알림이 삭제되었습니다. ✓");
     loadPushHistory(); loadDashboard();
@@ -783,10 +758,20 @@ window.deletePush = async (pushId) => {
 };
 
 // ── 설정 ─────────────────────────────────────
+async function loadSettingsPage() {
+  try {
+    const snap = await getDoc(doc(db, "app_config", "master"));
+    if (snap.exists()) {
+      document.getElementById("settings-master-email").value = snap.data().masterEmail || "";
+    }
+  } catch (e) { console.error("설정 로드 오류:", e); }
+}
+
 document.getElementById("save-settings-btn").addEventListener("click", async () => {
-  const name = document.getElementById("settings-name").value.trim();
-  const pw   = document.getElementById("settings-pw").value;
-  const msg  = document.getElementById("settings-msg");
+  const name        = document.getElementById("settings-name").value.trim();
+  const pw          = document.getElementById("settings-pw").value;
+  const newMasterEmail = document.getElementById("settings-master-email").value.trim();
+  const msg         = document.getElementById("settings-msg");
   msg.classList.add("hidden");
   try {
     const user = auth.currentUser;
@@ -799,6 +784,12 @@ document.getElementById("save-settings-btn").addEventListener("click", async () 
       if (pw.length < 6) { showToast("비밀번호는 6자 이상이어야 합니다."); return; }
       await updatePassword(user, pw);
       document.getElementById("settings-pw").value = "";
+    }
+    // ✅ 마스터 이메일 Firestore에 저장
+    if (newMasterEmail) {
+      await setDoc(doc(db, "app_config", "master"), { masterEmail: newMasterEmail }, { merge: true });
+      masterEmail = newMasterEmail;
+      showToast("마스터 이메일이 업데이트되었습니다! ✓");
     }
     msg.textContent = "저장되었습니다 ✓";
     msg.classList.remove("hidden");
