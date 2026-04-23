@@ -590,6 +590,7 @@ async function sendChatMessage() {
       senderId: auth.currentUser?.uid || "master",
       senderEmail: auth.currentUser?.email || "master",
       isFromMaster: true,
+      // ✅ 이 부분이 핵심 — 상대방 이메일로 저장
       chatUserEmail: selectedChatUser.email,
       timestamp: Date.now()
     });
