@@ -411,16 +411,20 @@ async function loadMessages() {
   const userList = document.getElementById("chat-user-list");
   userList.innerHTML = '<div class="empty-msg">로딩 중...</div>';
   try {
-    // 모든 메시지 불러오기
-    const q = query(collection(db, "messages"), orderBy("timestamp", "asc"));
-    const snap = await getDocs(q);
+    // 인덱스 없이 전체 로드 후 클라이언트 정렬
+    const snap = await getDocs(collection(db, "messages"));
     allMessages = [];
     snap.forEach(d => allMessages.push({ id: d.id, ...d.data() }));
+    allMessages.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
-    // 대화 상대 목록 생성 (senderEmail 기준 그룹화)
+    if (allMessages.length === 0) {
+      userList.innerHTML = '<div class="empty-msg">메시지가 없습니다</div>';
+      return;
+    }
     buildChatUserList(allMessages);
   } catch (e) {
     userList.innerHTML = `<div class="empty-msg">오류: ${e.message}</div>`;
+    console.error("메시지 로드 오류:", e);
   }
 }
 
