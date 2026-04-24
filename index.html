@@ -1,3 +1,4 @@
+<!-- ── [SECTION 1] Head ─────────────────────────────────────────────────────── -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -9,6 +10,7 @@
 </head>
 <body>
 
+<!-- ── [SECTION 2] Login Screen ───────────────────────────────────────────────── -->
   <div id="login-screen" class="login-screen">
     <div class="login-card">
       <div class="login-logo">
@@ -29,6 +31,7 @@
     </div>
   </div>
 
+<!-- ── [SECTION 3] App Shell (Sidebar + Content) ─────────────────────────────── -->
   <div id="app" class="app hidden">
     <aside class="sidebar">
       <div class="sidebar-logo">
@@ -90,7 +93,7 @@
         </div>
       </div>
 
-      <!-- 대시보드 -->
+<!-- ── [SECTION 4] Page — Dashboard ──────────────────────────────────────────── -->
       <section class="page active" id="page-dashboard">
         <div class="page-header">
           <h1>대시보드</h1>
@@ -156,7 +159,7 @@
         </div>
       </section>
 
-      <!-- 앱 관리 -->
+<!-- ── [SECTION 5] Page — Apps ────────────────────────────────────────────────── -->
       <section class="page" id="page-apps">
         <div class="page-header">
           <h1>앱 관리</h1>
@@ -193,7 +196,7 @@
         </div>
       </section>
 
-      <!-- 회원 관리 -->
+<!-- ── [SECTION 6] Page — Users ───────────────────────────────────────────────── -->
       <section class="page" id="page-users">
         <div class="page-header">
           <h1>회원 관리</h1>
@@ -214,103 +217,168 @@
         </div>
       </section>
 
-<!-- 메시지 -->
-<section class="page" id="page-messages">
-  <div class="page-header">
-    <h1>메시지</h1>
-  </div>
-
-  <!-- 채팅 레이아웃 -->
-  <div class="chat-layout">
-
-    <!-- 왼쪽: 대화 상대 목록 -->
-    <div class="chat-sidebar">
-      <div class="chat-sidebar-header">
-        <input type="text" id="chat-search" placeholder="이름 또는 이메일 검색..." class="chat-search-input" />
-      </div>
-      <div id="chat-user-list" class="chat-user-list">
-        <div class="empty-msg">로딩 중...</div>
-      </div>
-    </div>
-
-    <!-- 오른쪽: 채팅창 -->
-    <div class="chat-main">
-
-      <!-- 대화 상대 선택 전 -->
-      <div id="chat-empty-state" class="chat-empty-state">
-        <div style="font-size:40px; margin-bottom:12px;">💬</div>
-        <div style="color:var(--text-muted); font-size:14px;">대화 상대를 선택해주세요</div>
-      </div>
-
-      <!-- 채팅 내용 -->
-      <div id="chat-room" class="chat-room hidden">
-
-        <!-- 채팅 상단바 -->
-        <div class="chat-topbar">
-          <div class="chat-topbar-info">
-            <div class="avatar" id="chat-user-avatar" style="width:34px;height:34px;font-size:12px;">?</div>
-            <div>
-              <div class="chat-topbar-name" id="chat-user-name">—</div>
-              <div class="chat-topbar-email" id="chat-user-email">—</div>
+<!-- ── [SECTION 7] Page — Messages ───────────────────────────────────────────── -->
+      <section class="page" id="page-messages">
+        <div class="page-header">
+          <h1>메시지</h1>
+        </div>
+        <div class="chat-layout">
+          <div class="chat-sidebar">
+            <div class="chat-sidebar-header">
+              <input type="text" id="chat-search" placeholder="이름 또는 이메일 검색..."
+                class="chat-search-input" />
+            </div>
+            <div id="chat-user-list" class="chat-user-list">
+              <div class="empty-msg">로딩 중...</div>
+            </div>
+          </div>
+          <div class="chat-main">
+            <div id="chat-empty-state" class="chat-empty-state">
+              <div style="font-size:40px; margin-bottom:12px;">💬</div>
+              <div style="color:var(--text-muted); font-size:14px;">대화 상대를 선택해주세요</div>
+            </div>
+            <div id="chat-room" class="chat-room hidden">
+              <div class="chat-topbar">
+                <div class="chat-topbar-info">
+                  <div class="avatar" id="chat-user-avatar"
+                    style="width:34px;height:34px;font-size:12px;">?</div>
+                  <div>
+                    <div class="chat-topbar-name" id="chat-user-name">—</div>
+                    <div class="chat-topbar-email" id="chat-user-email">—</div>
+                  </div>
+                </div>
+              </div>
+              <div id="chat-messages" class="chat-messages"></div>
+              <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="메시지를 입력하세요..."
+                  class="chat-input" />
+                <button id="chat-send-btn" class="chat-send-btn">
+                  <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:white">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
+      </section>
 
-        <!-- 메시지 목록 -->
-        <div id="chat-messages" class="chat-messages"></div>
-
-        <!-- 입력창 -->
-        <div class="chat-input-area">
-          <input type="text" id="chat-input" placeholder="메시지를 입력하세요..." class="chat-input" />
-          <button id="chat-send-btn" class="chat-send-btn">
-            <svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:white"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-          </button>
+<!-- ── [SECTION 8] Page — Push Notifications ─────────────────────────────────── -->
+      <section class="page" id="page-push">
+        <div class="page-header">
+          <h1>푸시 알림</h1>
         </div>
-      </div>
+        <div class="card compose-form" id="push-compose">
+          <div class="card-header">
+            <span class="card-title">새 알림 작성</span>
+            <button class="btn-secondary hidden" id="push-new-btn">+ 새 알림</button>
+          </div>
+          <div id="push-edit-notice" class="edit-notice hidden"></div>
+          <div class="form-group">
+            <label>대상 앱</label>
+            <select id="push-appid" class="form-select">
+              <option value="all">전체 앱</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>제목</label>
+            <input type="text" id="push-title" placeholder="알림 제목을 입력하세요" />
+          </div>
+          <div class="form-group">
+            <label>내용</label>
+            <textarea id="push-body" placeholder="알림 내용을 입력하세요" rows="3"
+              style="width:100%;background:var(--input-bg);border:1px solid var(--border);
+              border-radius:8px;padding:10px;color:var(--text-heading);
+              font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" id="send-push-btn">
+              <svg viewBox="0 0 24 24"
+                style="width:16px;height:16px;fill:white;margin-right:6px;vertical-align:middle">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              </svg>발송하기
+            </button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">발송 내역</span>
+            <span id="push-total-count" style="font-size:12px;color:var(--text-muted)"></span>
+          </div>
+          <div class="push-search-bar"
+            style="display:flex;gap:8px;padding:12px 16px;
+            border-bottom:1px solid var(--border);flex-wrap:wrap;">
+            <input type="text" id="push-search" placeholder="제목 또는 내용 검색..."
+              style="flex:1;min-width:160px;background:var(--input-bg);
+              border:1px solid var(--border);border-radius:8px;padding:7px 12px;
+              color:var(--text-heading);font-size:13px;" />
+            <input type="date" id="push-date-from"
+              style="background:var(--input-bg);border:1px solid var(--border);
+              border-radius:8px;padding:7px 12px;color:var(--text-heading);font-size:13px;" />
+            <input type="date" id="push-date-to"
+              style="background:var(--input-bg);border:1px solid var(--border);
+              border-radius:8px;padding:7px 12px;color:var(--text-heading);font-size:13px;" />
+            <button id="push-search-btn" class="btn-secondary">검색</button>
+            <button id="push-reset-btn" class="btn-secondary">초기화</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:48px;text-align:center;">#</th>
+                  <th>제목</th>
+                  <th>내용</th>
+                  <th>대상</th>
+                  <th>발송일시</th>
+                  <th>작업</th>
+                </tr>
+              </thead>
+              <tbody id="push-history-tbody">
+                <tr><td colspan="6" class="empty-msg">로딩 중...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
-    </div>
-  </div>
-</section>
-
-<!-- 설정 -->
-<section class="page" id="page-settings">
-  <div class="page-header"><h1>설정</h1></div>
-  <div class="card" style="max-width:500px">
-    <div class="card-header"><span class="card-title">관리자 정보</span></div>
-    <div class="form-group">
-      <label>표시 이름</label>
-      <input type="text" id="settings-name" placeholder="관리자 이름" />
-    </div>
-    <div class="form-group">
-      <label>이메일 (변경 불가)</label>
-      <input type="email" id="settings-email" disabled />
-    </div>
-    <div class="form-group">
-      <label>새 비밀번호</label>
-      <input type="password" id="settings-pw" placeholder="변경할 비밀번호" />
-    </div>
-  </div>
-
-  <!-- ✅ 앱 설정 카드 -->
-  <div class="card" style="max-width:500px">
-    <div class="card-header"><span class="card-title">앱 설정</span></div>
-    <div class="form-group">
-      <label>마스터 이메일</label>
-      <input type="email" id="settings-master-email" placeholder="마스터 이메일 주소" />
-      <p style="font-size:11px; color:var(--text-muted); margin-top:6px;">
-        💡 이 이메일로 앱에서 로그인하면 마스터(관리자)로 인식돼요.
-      </p>
-    </div>
-    <div class="form-actions">
-      <button class="btn-primary" id="save-settings-btn">저장하기</button>
-    </div>
-    <p id="settings-msg" class="success-msg hidden"></p>
-  </div>
-</section>
+<!-- ── [SECTION 9] Page — Settings ───────────────────────────────────────────── -->
+      <section class="page" id="page-settings">
+        <div class="page-header"><h1>설정</h1></div>
+        <div class="card" style="max-width:500px">
+          <div class="card-header"><span class="card-title">관리자 정보</span></div>
+          <div class="form-group">
+            <label>표시 이름</label>
+            <input type="text" id="settings-name" placeholder="관리자 이름" />
+          </div>
+          <div class="form-group">
+            <label>이메일 (변경 불가)</label>
+            <input type="email" id="settings-email" disabled />
+          </div>
+          <div class="form-group">
+            <label>새 비밀번호</label>
+            <input type="password" id="settings-pw" placeholder="변경할 비밀번호" />
+          </div>
+        </div>
+        <div class="card" style="max-width:500px">
+          <div class="card-header"><span class="card-title">앱 설정</span></div>
+          <div class="form-group">
+            <label>마스터 이메일</label>
+            <input type="email" id="settings-master-email" placeholder="마스터 이메일 주소" />
+            <p style="font-size:11px;color:var(--text-muted);margin-top:6px;">
+              💡 이 이메일로 앱에서 로그인하면 마스터(관리자)로 인식돼요.
+            </p>
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" id="save-settings-btn">저장하기</button>
+          </div>
+          <p id="settings-msg" class="success-msg hidden"></p>
+        </div>
+      </section>
 
     </main>
   </div>
 
+<!-- ── [SECTION 10] Toast & Scripts ──────────────────────────────────────────── -->
   <div id="toast" class="toast hidden"></div>
   <script type="module" src="app.js"></script>
 </body>
