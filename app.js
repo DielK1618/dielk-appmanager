@@ -590,20 +590,11 @@ async function sendChatMessage() {
       senderId: auth.currentUser?.uid || "master",
       senderEmail: auth.currentUser?.email || "master",
       isFromMaster: true,
-      // ✅ 이 부분이 핵심 — 상대방 이메일로 저장
       chatUserEmail: selectedChatUser.email,
       timestamp: Date.now()
     });
     input.value = "";
-    await addDoc(collection(db, "push_queue"), {
-      appId: "dielk-vault",
-      title: "새 메시지",
-      body: text.length > 50 ? text.slice(0, 50) + "..." : text,
-      status: "pending",
-      createdAt: serverTimestamp(),
-      sentBy: auth.currentUser?.email || "master",
-      type: "message"
-    });
+    // ✅ push_queue 저장 제거 — messages 트리거가 FCM 알림 처리
   } catch (e) { showToast("전송 실패: " + e.message); }
 }
 
